@@ -11,7 +11,8 @@
 // #include <sys/time.h>
 
 using namespace std;
-int main0(int argc, char *argv[],int flag, FILE* data,FILE* re,int writedata);
+int main0(int argc, char *argv[],int flag,FILE* re);
+// int main0(int argc, char *argv[],int flag, FILE* data,FILE* re,int writedata);
 int copy(char* to, char* from, int start, int end );
 
 int copy(char* to, char* from, int start, int end ){
@@ -28,21 +29,60 @@ int copy(char* to, char* from, int start, int end ){
   return 0;
 }
 
+void writeFile(FILE* r, char* filename, char* name){
+      FILE* w=fopen(filename,"w");
+      if(w==NULL){
+        printf("cannot open file w\n");
+        return ;
+      }
+      fprintf(w,"%s\n",name);
+      //fwrite(name,1,strlen(name),w);fwrite("\n",1,1,w);
+      while(1) {
+        char buf[100];
+        fscanf(r, "%[^\n] ", buf);
+        if(buf[0]=='>'){
+          memset(name, '\0', sizeof(name));
+          strcpy(name,buf);
+          break;
+        }
+        // fwrite(buf,1,strlen(buf),w);fwrite("\n",1,1,w);
+        fprintf(w,"%s\n",buf);
+        if(feof(r)){
+          break;
+        }
+        
+      }
+      fclose(w);//finish writing the fasta file
+}
+
 int main(int argc, char *argv[]){
-  
+  // ./RNAprofile sourceFile [startFrom] repeateTimes
+  // e.g. ./RNAprofile 3.txt 10
+  // or ./RNAprofile 3.txt 1 10
+  // startFrom is used when intruupted before and want to continue
+  // startFrom is the number of RNAs has been tested before
   int n=atoi(argv[argc-1]);
+  int start=0;
   FILE* r;//source file
   FILE* result;
-  FILE* not0;
-  FILE* data;
+  // FILE* not0;
+  // FILE* data;
   int writedata=0;
   clock_t time;
   clock_t totaltime;
   totaltime=clock();
-  r=fopen(argv[argc-2],"r");
-  result=fopen("temp.txt","w+");
-  not0=fopen("delete.txt","w+");
-  data=fopen("data.txt","w+");
+  r=fopen(argv[1],"r");
+
+  if(argc>3){
+    start=atoi(argv[2]);
+    result=fopen("temp.txt","a+");
+  }else{
+    result=fopen("temp.txt","w+");
+  }
+
+  
+  // not0=fopen("delete.txt","w+");
+  // data=fopen("data.txt","w+");
     if(r==NULL){
       printf("cannot open file r %s\n",argv[argc-2]);
       return 0;
@@ -51,62 +91,47 @@ int main(int argc, char *argv[]){
       printf("%s\n","cannot open file result");
       return 0;
     }
-    if(not0==NULL){
-      printf("%s\n","cannot open file not0(delete.txt)");
-      return 0;
-    }
-    if(data==NULL){
-      printf("%s\n","cannot open file data");
-      return 0;
-    }
+    // if(not0==NULL){
+    //   printf("%s\n","cannot open file not0(delete.txt)");
+    //   return 0;
+    // }
+    // if(data==NULL){
+    //   printf("%s\n","cannot open file data");
+    //   return 0;
+    // }
     char name[256];
     fscanf(r, "%[^\n] ", name);
+    fclose(result);
     while(1) {writedata++;
       time=clock();
-        result=fopen("temp.txt","a+");
-		if(name[0]=='>'){
+      result=fopen("temp.txt","a+");
+		
+    if(name[0]=='>'){
 		  //create a new fasta file for the RNA
 			char filename[25];
 			copy(filename,name,1,21);
-			FILE* w;
-			w=fopen(filename,"w");
-			if(w==NULL){
-			  printf("cannot open file w\n");
-			  return 0;
-			}
-			fprintf(w,"%s\n",name);
-			//fwrite(name,1,strlen(name),w);fwrite("\n",1,1,w);
-			while(1) {
-			  char buf[100];
-			  fscanf(r, "%[^\n] ", buf);
-			  if(buf[0]=='>'){
-			    memset(name, '\0', sizeof(name));
-			    strcpy(name,buf);
-			    break;
-			  }
-			  // fwrite(buf,1,strlen(buf),w);fwrite("\n",1,1,w);
-			  fprintf(w,"%s\n",buf);
-			  if(feof(r)){
-			    break;
-			  }
-			  
-			}
-			fclose(w);//finish writing the fasta file
-		        
+      writeFile(r, filename, name);
+			
+
+      if(writedata<=start){
+        fclose(result);
+        continue;
+      }
+      
 			char* argvs[2];
+      argvs[0]=argv[0];
 			argvs[1]=filename;
 			int x[n];
 			int i;
 			float average, variance, std_deviation, sum = 0, sum1 = 0;
-			if(writedata<=20){
-			  fprintf(data,"%s",filename);
-			}
+			// if(writedata<=20){
+			//   fprintf(data,"%s",filename);
+			// }
 			
-
-			fprintf(result,"%s",filename);
-			for (i = 0; i < n; i++) {       
-			  x[i]=main0(argc-1, argvs,i,data,result,writedata);
-			}
+      fprintf(result,"%s\n",filename);
+      for (i = 0; i < n; i++) {
+        x[i]=main0(2, argvs,i,result);
+		 }
 
 			for (i = 0; i < n; i++) {
 			  sum = sum + x[i];
@@ -121,7 +146,7 @@ int main(int argc, char *argv[]){
 			printf("Average = %.3f\n", average);
 			printf("Standard deviation = %.4f\n", std_deviation);
 	        
-			fprintf(result,"\t%.3f\t%.4f\n",
+			fprintf(result,"%.3f\t%.4f\n",
 				average,std_deviation);
 	        
 		 //        if(writedata<=20){
@@ -139,8 +164,8 @@ int main(int argc, char *argv[]){
     }
     fclose(r);
     fclose(result);
-    fclose(not0);
-    fclose(data);
+    // fclose(not0);
+    // fclose(data);
     totaltime=clock()-totaltime;
     double seconds=((double)totaltime)/CLOCKS_PER_SEC;
     printf("total takes: %f\n",seconds);
@@ -148,14 +173,15 @@ int main(int argc, char *argv[]){
 }
 
 /*input first the fasta file, then optionally the sample_1000.out file run on the fasta, then options*/
-int main0(int argc, char *argv[],int flag,FILE* data,FILE* re,int writedata) {
+int main0(int argc, char *argv[],int flag,FILE* re) {
+// int main0(int argc, char *argv[],int flag,FILE* data,FILE* re,int writedata) {
   int i,input = 0, gtargs = 9;
   char **args = NULL, *name;
   HASHTBL *deleteHash;
   FILE *fp;
   Set *set;
   Options *opt;
-
+   
   if (argc < 2 || !strcmp(argv[1],"--help")) {
 /*print out list of options
     fprintf(stderr,"Not enough arguments\n");
@@ -389,13 +415,13 @@ GTBOLTZMANN OPTIONS
  //      // fprintf(data,"%d\n",helices[12]->freq);
  //    }
    
-  //   if(flag==0){
-  //     //HC **helices=set->helices;
-  //      for(int i=0;i<result+5;i++){
-	 // fprintf(re,"%d\t",helices[i]->freq);
-  //      }
-  //      fprintf(re,"%d\n",helices[result+5]->freq);
-  //      }
+    if(flag==0){
+      //HC **helices=set->helices;
+       for(int i=0;i<result+5;i++){
+	 fprintf(re,"%d\t",helices[i]->freq);
+       }
+       fprintf(re,"%d\n",helices[result+5]->freq);
+       }
     /*
   //printf("Total number of featured helix classes: %d\n",set->num_fhc);
     if (opt->SFOLD) 
